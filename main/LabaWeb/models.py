@@ -1,9 +1,11 @@
 from django.db import models
 
-class Todo(models.Model):
+class Note(models.Model):
+    """
+    модель - простая заметка с заголовком и описанием.
+    """
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    completed = models.BooleanField(default=False)
+    content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
