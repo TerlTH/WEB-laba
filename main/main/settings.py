@@ -90,7 +90,9 @@ REST_FRAMEWORK = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 # Сессии
 SESSION_COOKIE_AGE = 1209600  # 2 недели
