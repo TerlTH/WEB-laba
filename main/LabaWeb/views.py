@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework import generics
 from rest_framework import filters
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -30,6 +31,7 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
     filterset_fields = ['title']              # ?title=...
     search_fields = ['title', 'content']      # ?search=...
     ordering_fields = ['created_at', 'title'] # ?ordering=created_at
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 
 class NoteRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):

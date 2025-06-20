@@ -4,37 +4,36 @@ function App() {
   const [notes, setNotes] = useState([]);
   const [form, setForm] = useState({ title: '', content: '' });
   const [search, setSearch] = useState('');
+  const [auth, setAuth] = useState({ username: '', password: '' });
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
 
-  // Загрузка заметок с сервера
   const fetchNotes = (query = '') => {
-  let url = 'http://127.0.0.1:8000/api/notes/';
-  if (query) {
-    url += `?search=${encodeURIComponent(query)}`;
-  }
+    let url = 'http://127.0.0.1:8000/api/notes/';
+    if (query) {
+      url += `?search=${encodeURIComponent(query)}`;
+    }
 
-  fetch(url)
-    .then(res => res.json())
-    .then(data => {
-      const notesList = Array.isArray(data) ? data : data.results;
-      if (Array.isArray(notesList)) {
-        setNotes(notesList);
-      } else {
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const notesList = Array.isArray(data) ? data : data.results;
+        if (Array.isArray(notesList)) {
+          setNotes(notesList);
+        } else {
+          setNotes([]);
+          console.error('API не вернул массив заметок.');
+        }
+      })
+      .catch(err => {
+        console.error('Ошибка загрузки заметок:', err);
         setNotes([]);
-        console.error("API не вернул массив заметок.");
-      }
-    })
-    .catch(err => {
-      console.error("Ошибка загрузки заметок:", err);
-      setNotes([]);
-    });
-};
+      });
+  };
 
-  // Первый запуск
   useEffect(() => {
     fetchNotes();
   }, []);
 
-  // Поиск по мере ввода
   useEffect(() => {
     const delay = setTimeout(() => {
       fetchNotes(search);
@@ -42,20 +41,51 @@ function App() {
     return () => clearTimeout(delay);
   }, [search]);
 
-  // Отправка новой заметки
+  const handleLogin = (e) => {
+    e.preventDefault();
+
+    fetch('http://127.0.0.1:8000/api-token-auth/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(auth),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          setToken(data.token);
+          alert('Вы успешно вошли в систему');
+        } else {
+          alert('Ошибка авторизации');
+        }
+      })
+      .catch(() => alert('Ошибка соединения с сервером'));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
     fetch('http://127.0.0.1:8000/api/notes/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
       body: JSON.stringify(form),
     })
-      .then(res => res.json())
-      .then(() => {
-        setForm({ title: '', content: '' });
-        setSearch('');       // ⬅️ сброс фильтра
-        fetchNotes();        // ⬅️ загрузка всех заново
+      .then(res => {
+        if (res.status === 401) {
+          alert('Вы не авторизованы');
+          return null;
+        }
+        return res.json();
+      })
+      .then(newNote => {
+        if (newNote) {
+          setForm({ title: '', content: '' });
+          setSearch('');
+          fetchNotes();
+        }
       });
   };
 
@@ -63,14 +93,40 @@ function App() {
     <div style={{ maxWidth: 600, margin: '0 auto', padding: 20 }}>
       <h2>Заметки</h2>
 
+      {/* 🔐 Форма входа */}
+      {!token && (
+        <form onSubmit={handleLogin} style={{ marginBottom: 20 }}>
+          <h4>Вход</h4>
+          <input
+            type="text"
+            placeholder="Логин"
+            value={auth.username}
+            onChange={e => setAuth({ ...auth, username: e.target.value })}
+            required
+          />
+          <br />
+          <input
+            type="password"
+            placeholder="Пароль"
+            value={auth.password}
+            onChange={e => setAuth({ ...auth, password: e.target.value })}
+            required
+          />
+          <br />
+          <button type="submit">Войти</button>
+        </form>
+      )}
+
+      {/* 🔍 Поиск */}
       <input
         type="text"
-        placeholder="Поиск по заголовку или описанию..."
+        placeholder="Поиск..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         style={{ width: '100%', marginBottom: 10 }}
       />
 
+      {/* ➕ Форма добавления заметки */}
       <form onSubmit={handleSubmit}>
         <input
           type="text"
@@ -86,9 +142,10 @@ function App() {
           onChange={e => setForm({ ...form, content: e.target.value })}
         />
         <br />
-        <button type="submit">Добавить</button>
+        <button type="submit" disabled={!token}>Добавить</button>
       </form>
 
+      {/* 📄 Список заметок */}
       <ul>
         {Array.isArray(notes) && notes.length > 0 ? (
           notes.map(note => (
