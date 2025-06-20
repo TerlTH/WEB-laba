@@ -4,7 +4,8 @@ from .views import (
     NoteListCreateAPIView,
     NoteRetrieveUpdateDestroyAPIView,
     RegisterView, LoginView, LogoutView,
-    ProfileView, UserListView
+    ProfileView, UserListView,
+    SafeInputView
 )
 
 urlpatterns = [
@@ -19,4 +20,8 @@ urlpatterns += [
     path('users/logout/', LogoutView.as_view()),
     path('users/profile/', ProfileView.as_view()),
     path('users/list/', UserListView.as_view()),
+]
+
+urlpatterns += [
+    path('safe/', SafeInputView.as_view()),
 ]

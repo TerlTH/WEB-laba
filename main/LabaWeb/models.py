@@ -7,6 +7,7 @@ class Note(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(upload_to='notes/', blank=True, null=True)
 
     def __str__(self):
         return self.title

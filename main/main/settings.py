@@ -14,6 +14,9 @@ DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -101,6 +104,10 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_AGE = 1209600  # 2 недели
 SESSION_SAVE_EVERY_REQUEST = True
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 LANGUAGE_CODE = 'ru-ru'  
 TIME_ZONE = 'Europe/Berlin'

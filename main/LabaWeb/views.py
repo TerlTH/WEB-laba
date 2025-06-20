@@ -9,7 +9,8 @@ from rest_framework.serializers import ModelSerializer
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import serializers
 
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,6 +20,45 @@ from django.contrib.auth import authenticate, login, logout
 from .models import Note
 from .serializers import NoteSerializer
 
+class SafeInputView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        name = request.data.get('name')
+        age = request.data.get('age')
+
+        # Валидация имени
+        if not name or not isinstance(name, str):
+            return Response({'error': 'Поле \"name\" обязательно и должно быть строкой'}, status=400)
+
+        # Валидация возраста
+        if age:
+            try:
+                age = int(age)
+            except ValueError:
+                return Response({'error': 'Поле \"age\" должно быть числом'}, status=400)
+
+        return Response({
+            'message': 'Данные приняты',
+            'name': name.strip(),
+            'age': age
+        })
+    
+
+class FileUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'Файл обязателен'}, status=400)
+
+        return Response({
+            'filename': file.name,
+            'size': file.size
+        })
+
 
 class NoteListCreateAPIView(generics.ListCreateAPIView):
     """
@@ -27,7 +67,8 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
     """
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     filter_backends = [
         DjangoFilterBackend,
@@ -49,16 +90,23 @@ class NoteRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
 
+class UserRegisterSerializer(serializers.ModelSerializer):
+    age = serializers.IntegerField(write_only=True)
 
-class UserRegisterSerializer(ModelSerializer):
     class Meta:
         model = User
-        fields = ('username', 'password')
+        fields = ('username', 'password', 'age')
+
+    def validate_age(self, value):
+        if value < 18:
+            raise serializers.ValidationError("Регистрация доступна только с 18 лет.")
+        return value
 
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        return user
+        validated_data.pop('age')  # убираем, чтобы не ушло в User.create_user
+        return User.objects.create_user(**validated_data)
     
 
 class RegisterView(generics.CreateAPIView):
@@ -93,13 +141,10 @@ class ProfileView(APIView):
     def get(self, request):
         return Response({"user": request.user.username})
     
-class UserListPagination(PageNumberPagination):
-    page_size = 5
 
 class UserListView(ListAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
-    pagination_class = UserListPagination
     permission_classes = [IsAuthenticated]
     
 
