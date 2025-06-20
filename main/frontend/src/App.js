@@ -25,6 +25,7 @@ function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [user, setUser] = useState(null);
   const [users, setUsers] = useState([]);
+  const [editNoteId, setEditNoteId] = useState(null);
 
   const fetchNotes = (query = '') => {
     let url = `${API}/notes/`;
@@ -57,38 +58,43 @@ function App() {
   }, [search]);
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const formData = new FormData();
-    formData.append('title', form.title);
-    formData.append('content', form.content);
-    if (form.file) {
-      formData.append('file', form.file);
-    }
+  const formData = new FormData();
+  formData.append('title', form.title);
+  formData.append('content', form.content);
+  if (form.file instanceof File) {
+    formData.append('file', form.file);
+  }
 
-    fetch(`${API}/notes/`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'X-CSRFToken': getCookie('csrftoken'),
-      },
-      body: formData,
+  const method = editNoteId ? 'PUT' : 'POST';
+  const url = editNoteId ? `${API}/notes/${editNoteId}/` : `${API}/notes/`;
+
+  fetch(url, {
+    method,
+    credentials: 'include',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: formData,
+  })
+    .then(res => {
+      if (res.status === 403) {
+        alert('Вы не можете редактировать чужую заметку.');
+        return null;
+      }
+      return res.json();
     })
-      .then(res => {
-        if (res.status === 401) {
-          alert('Вы не авторизованы');
-          return null;
-        }
-        return res.json();
-      })
-      .then(newNote => {
-        if (newNote) {
-          setForm({ title: '', content: '', file: null });
-          setSearch('');
-          fetchNotes();
-        }
-      });
-  };
+    .then(data => {
+      if (data) {
+        setForm({ title: '', content: '', file: null });
+        setEditNoteId(null);
+        fetchNotes();
+      }
+    })
+    .catch(() => alert('Ошибка при сохранении'));
+};
+
 
   const handleRegister = (e) => {
     e.preventDefault();
@@ -147,6 +153,29 @@ function App() {
       alert('Вы вышли');
     });
   };
+
+  const handleDelete = (noteId) => {
+  if (!window.confirm('Удалить эту заметку?')) return;
+
+  fetch(`${API}/notes/${noteId}/`, {
+    method: 'DELETE',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    credentials: 'include',
+  })
+    .then(res => {
+      if (res.status === 403) {
+        alert('Вы не можете удалить чужую заметку.');
+        return;
+      }
+      if (res.status === 204) {
+        alert('Заметка удалена');
+        fetchNotes();
+      }
+    })
+    .catch(() => alert('Ошибка при удалении'));
+};
 
   const fetchProfile = () => {
     fetch(`${API}/users/profile/`, {
@@ -279,6 +308,25 @@ function App() {
                     📎 Открыть файл
                 </button>
               )}
+              {note.owner === user && (
+                <button onClick={() => handleDelete(note.id)} style={{ marginLeft: 10 }}>
+                  ❌ Удалить
+                </button>
+              )}
+              <button onClick={() => {
+                  setEditNoteId(note.id);
+                  setForm({ title: note.title, content: note.content, file: null });
+                }} style={{ marginLeft: 5 }}>
+                  ✏️ Редактировать
+                </button>
+                {editNoteId === note.id && (
+                    <button onClick={() => {
+                      setEditNoteId(null);
+                      setForm({ title: '', content: '', file: null });
+                    }} style={{ marginLeft: 10 }}>
+                      Отменить редактирование
+                    </button>
+                  )}
             </li>
           ))
         ) : (

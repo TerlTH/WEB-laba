@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -70,6 +71,9 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -86,11 +90,18 @@ class NoteRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
     GET /api/notes/<id>/ — детали
     PUT/PATCH/DELETE /api/notes/<id>/ — обновление/удаление
+    Только для владельца заметки
     """
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
+
+    def get_object(self):
+        note = get_object_or_404(Note, pk=self.kwargs['pk'])
+        if note.owner != self.request.user:
+            raise PermissionDenied("Вы не являетесь владельцем этой заметки.")
+        return note
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     age = serializers.IntegerField(write_only=True)
