@@ -1,8 +1,12 @@
 from django.urls import path
-from .views import HelloWorldAPIView, NoteAPIView
+from .views import (
+    HelloWorldAPIView,
+    NoteListCreateAPIView,
+    NoteRetrieveUpdateDestroyAPIView
+)
 
 urlpatterns = [
     path('hello/', HelloWorldAPIView.as_view(), name='hello-world'),
-    path('notes/', NoteAPIView.as_view(), name='note-list-create'),
-    path('notes/<int:pk>/', NoteAPIView.as_view(), name='note-detail'),
+    path('notes/', NoteListCreateAPIView.as_view(), name='note-list-create'),
+    path('notes/<int:pk>/', NoteRetrieveUpdateDestroyAPIView.as_view(), name='note-detail'),
 ]
