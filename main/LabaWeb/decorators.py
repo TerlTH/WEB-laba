@@ -3,6 +3,11 @@ from django.http import JsonResponse
 from .models import Note
 
 def owner_required(view_func):
+    """
+    Декоратор, проверяющий, что текущий пользователь является владельцем заметки.
+    Используется для защиты представлений от несанкционированного доступа.
+    
+    """
     @wraps(view_func)
     def _wrapped_view(self, request, *args, **kwargs):
         note_id = kwargs.get('pk')

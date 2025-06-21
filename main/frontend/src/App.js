@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+// Получение значения cookie по имени
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -27,12 +28,12 @@ function App() {
   const [user, setUser] = useState(null);
   const [editNoteId, setEditNoteId] = useState(null);
 
-  // 🟢 Вызов при загрузке страницы — проверка авторизации
+  //Вызов при загрузке страницы — проверка авторизации
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  // 🔄 Загрузка данных при смене вкладки (если пользователь уже авторизован)
+  //Загрузка данных при смене вкладки (если пользователь уже авторизован)
   useEffect(() => {
     if (user) {
       selectedTab === 'notes' ? fetchNotes() : fetchProducts();
@@ -40,24 +41,28 @@ function App() {
   }, [selectedTab, user]);
 
   const fetchNotes = () => {
+    // Загрузка списка заметок
     fetch(`${API}/notes/`)
       .then(res => res.json())
       .then(data => setNotes(Array.isArray(data) ? data : data.results));
   };
 
   const fetchProducts = () => {
+    // Загрузка списка шаблонов (products)
     fetch(`${API}/products/`)
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : data.results));
   };
 
   const fetchProfile = () => {
+    // Получение информации о текущем пользователе
     fetch(`${API}/users/profile/`, { credentials: 'include' })
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setUser(data.user))
       .catch(() => setUser(null));
   };
 
+  //Создание или обновление заметки/шаблона
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -93,6 +98,7 @@ function App() {
       });
   };
 
+  // Удаление заметки или шаблона по ID
   const handleDelete = (id, type) => {
     if (!window.confirm('Удалить?')) return;
     fetch(`${API}/${type}/${id}/`, {
@@ -104,6 +110,7 @@ function App() {
     });
   };
 
+  // Создание заметки на основе шаблона
   const handleAddProductToNotes = (product) => {
     const formData = new FormData();
     formData.append('title', product.title);
@@ -122,6 +129,7 @@ function App() {
     });
   };
 
+  // Обработка входа пользователя
   const handleLogin = (e) => {
     e.preventDefault();
     fetch(`${API}/users/login/`, {
@@ -143,6 +151,7 @@ function App() {
       });
   };
 
+  // Обработка регистрации пользователя
   const handleRegister = (e) => {
     e.preventDefault();
     fetch(`${API}/users/register/`, {
@@ -159,6 +168,7 @@ function App() {
     });
   };
 
+  // Выход пользователя
   const handleLogout = () => {
     fetch(`${API}/users/logout/`, {
       method: 'POST',
@@ -167,6 +177,7 @@ function App() {
     }).then(() => setUser(null));
   };
 
+  // Отображение формы входа/регистрации или основного интерфейса
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
       <h2>📌 Сервис заметок</h2>

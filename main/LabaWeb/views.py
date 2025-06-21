@@ -30,19 +30,31 @@ from channels.layers import get_channel_layer
 
 
 class ProductViewSet(ModelViewSet):
+    # CRUD-доступ к шаблонам продуктов
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def perform_create(self, serializer):
+        # Автоматически назначает текущего пользователя как владельца продукта
         serializer.save(owner=self.request.user)
         self.broadcast_product_count()
+
+    def broadcast_product_count(self):
+        # Отправляет обновление количества продуктов через WebSocket
+        count = Product.objects.count()
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "products",
+            {"type": "product.update", "count": count}
+        )
 
 
 class SafeInputView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Принимает и валидирует данные: name и age
         name = request.data.get('name')
         age = request.data.get('age')
 
@@ -69,6 +81,7 @@ class FileUploadView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Обрабатывает загрузку файла, возвращает имя и размер
         file = request.FILES.get('file')
         if not file:
             return Response({'error': 'Файл обязателен'}, status=400)
@@ -90,14 +103,17 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
+        # Устанавливает текущего пользователя владельцем заметки
         serializer.save(owner=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
+        # Удаление заметки с отправкой обновления WebSocket
         response = super().destroy(request, *args, **kwargs)
         self.broadcast_product_count()
         return response
     
     def broadcast_product_count(self):
+        # Отправка количества продуктов через WebSocket
         count = Product.objects.count()
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -105,6 +121,7 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
             {"type": "product.update", "count": count}
         )
 
+    # Настройка фильтров
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -129,6 +146,7 @@ class NoteRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def get_object(self):
+        # Получение заметки и проверка владельца
         note = get_object_or_404(Note, pk=self.kwargs['pk'])
         if note.owner != self.request.user:
             raise PermissionDenied("Вы не являетесь владельцем этой заметки.")
@@ -152,6 +170,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     
 
 class RegisterView(generics.CreateAPIView):
+    # Регистрация пользователя
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
     permission_classes = [AllowAny]
@@ -161,6 +180,7 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Аутентификация пользователя по логину и паролю
         user = authenticate(
             username=request.data.get("username"),
             password=request.data.get("password")
@@ -173,6 +193,7 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     def post(self, request):
+        # Выход пользователя
         logout(request)
         return Response({"message": "Вы вышли"}, status=status.HTTP_200_OK)
     
@@ -181,10 +202,12 @@ class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # Получение имени текущего пользователя
         return Response({"user": request.user.username})
     
 
 class UserListView(ListAPIView):
+    # Список всех пользователей (доступен только авторизованным)
     queryset = User.objects.all()
     serializer_class = UserRegisterSerializer
     permission_classes = [IsAuthenticated]
@@ -203,6 +226,7 @@ class HelloWorldAPIView(APIView):
     """
 
     def get(self, request):
+        # Ответ на GET-запрос — приветствие
         return Response({
             "status": "success",
             "method": "GET",
@@ -210,6 +234,7 @@ class HelloWorldAPIView(APIView):
         })
 
     def post(self, request):
+        # Ответ на POST-запрос — проверка и возврат имени
         data = request.data
 
         # Простая ручная валидация

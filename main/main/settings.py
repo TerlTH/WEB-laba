@@ -2,13 +2,16 @@ import os
 from pathlib import Path
 import environ
 
+# Настройка переменных окружения через .env
 env = environ.Env(
     DEBUG=(bool, False)
 )
 BASE_DIR = Path(__file__).resolve().parent.parent  
 
+# Загрузка .env-файла
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
+# Секреты и настройки среды
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
@@ -19,6 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 INSTALLED_APPS = [
+    # Приложения Django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,7 +43,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # CORS
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -47,7 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'LabaWeb.middleware.ActionLoggingMiddleware',
+    'LabaWeb.middleware.ActionLoggingMiddleware', # Пользовательское логирование
 ]
 
 ROOT_URLCONF = 'main.urls'
@@ -71,6 +75,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'main.wsgi.application'
 ASGI_APPLICATION = 'main.asgi.application'
 
+# Настройка базы данных через env
 DATABASES = {
     'default': env.db(
         default='sqlite:///' + os.path.join(BASE_DIR, 'db.sqlite3')
@@ -112,14 +117,16 @@ SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_AGE = 1209600  # 2 недели
 SESSION_SAVE_EVERY_REQUEST = True
 
+# Медиа-файлы
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-
+# Локализация и часовой пояс
 LANGUAGE_CODE = 'ru-ru'  
 TIME_ZONE = 'Europe/Berlin'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
+# Статика
 STATIC_URL = '/static/'
