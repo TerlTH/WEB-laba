@@ -27,6 +27,18 @@ function App() {
   const [user, setUser] = useState(null);
   const [editNoteId, setEditNoteId] = useState(null);
 
+  // 🟢 Вызов при загрузке страницы — проверка авторизации
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  // 🔄 Загрузка данных при смене вкладки (если пользователь уже авторизован)
+  useEffect(() => {
+    if (user) {
+      selectedTab === 'notes' ? fetchNotes() : fetchProducts();
+    }
+  }, [selectedTab, user]);
+
   const fetchNotes = () => {
     fetch(`${API}/notes/`)
       .then(res => res.json())
@@ -39,10 +51,12 @@ function App() {
       .then(data => setProducts(Array.isArray(data) ? data : data.results));
   };
 
-  useEffect(() => {
-    selectedTab === 'notes' ? fetchNotes() : fetchProducts();
-    fetchProfile();
-  }, [selectedTab]);
+  const fetchProfile = () => {
+    fetch(`${API}/users/profile/`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setUser(data.user))
+      .catch(() => setUser(null));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -54,9 +68,9 @@ function App() {
       formData.append('file', form.file);
     }
     if (selectedTab === 'products') {
-  formData.append('description', form.content); 
-  formData.delete('content'); 
-}
+      formData.append('price', form.price || '0');
+      formData.append('description', form.content); // 👈 ключевая строка
+    }
 
     const url = selectedTab === 'notes'
       ? (editNoteId ? `${API}/notes/${editNoteId}/` : `${API}/notes/`)
@@ -91,23 +105,10 @@ function App() {
   };
 
   const handleAddProductToNotes = (product) => {
-  const formData = new FormData();
-  formData.append('title', product.title);
-  formData.append('content', product.description || ''); // 👈 вот тут точно копируем
-  if (product.file) {
-    // если product.file — строка URL
-    fetch(product.file)
-      .then(res => res.blob())
-      .then(blob => {
-        const filename = product.file.split('/').pop();
-        formData.append('file', new File([blob], filename));
-        sendNote();
-      });
-  } else {
-    sendNote();
-  }
+    const formData = new FormData();
+    formData.append('title', product.title);
+    formData.append('content', product.description || '');
 
-  function sendNote() {
     fetch(`${API}/notes/`, {
       method: 'POST',
       credentials: 'include',
@@ -115,19 +116,10 @@ function App() {
         'X-CSRFToken': getCookie('csrftoken'),
       },
       body: formData,
-    })
-      .then(() => {
-        alert('Шаблон добавлен в заметки!');
-        fetchNotes();
-      });
-  }
-};
-
-  const fetchProfile = () => {
-    fetch(`${API}/users/profile/`, { credentials: 'include' })
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setUser(data.user))
-      .catch(() => setUser(null));
+    }).then(() => {
+      alert('Шаблон добавлен в заметки!');
+      fetchNotes();
+    });
   };
 
   const handleLogin = (e) => {

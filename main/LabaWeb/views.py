@@ -25,6 +25,9 @@ from .models import Product
 from .serializers import NoteSerializer
 from .serializers import ProductSerializer
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
@@ -33,8 +36,9 @@ class ProductViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+        self.broadcast_product_count()
 
-        
+
 class SafeInputView(APIView):
     permission_classes = [AllowAny]
 
@@ -87,6 +91,19 @@ class NoteListCreateAPIView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        response = super().destroy(request, *args, **kwargs)
+        self.broadcast_product_count()
+        return response
+    
+    def broadcast_product_count(self):
+        count = Product.objects.count()
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "products",
+            {"type": "product.update", "count": count}
+        )
 
     filter_backends = [
         DjangoFilterBackend,
