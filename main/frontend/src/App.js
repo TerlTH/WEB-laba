@@ -18,108 +18,120 @@ function getCookie(name) {
 function App() {
   const API = 'http://localhost:8000/api';
 
+  const [selectedTab, setSelectedTab] = useState('notes');
   const [notes, setNotes] = useState([]);
-  const [form, setForm] = useState({ title: '', content: '', file: null });
-  const [search, setSearch] = useState('');
+  const [products, setProducts] = useState([]);
+  const [form, setForm] = useState({ title: '', content: '', file: null, price: '' });
   const [registerForm, setRegisterForm] = useState({ username: '', password: '', age: '' });
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [user, setUser] = useState(null);
-  const [users, setUsers] = useState([]);
   const [editNoteId, setEditNoteId] = useState(null);
 
-  const fetchNotes = (query = '') => {
-    let url = `${API}/notes/`;
-    if (query) {
-      url += `?search=${encodeURIComponent(query)}`;
-    }
-
-    fetch(url)
+  const fetchNotes = () => {
+    fetch(`${API}/notes/`)
       .then(res => res.json())
-      .then(data => {
-        const notesList = Array.isArray(data) ? data : data.results;
-        if (Array.isArray(notesList)) {
-          setNotes(notesList);
-        } else {
-          setNotes([]);
-        }
-      });
+      .then(data => setNotes(Array.isArray(data) ? data : data.results));
+  };
+
+  const fetchProducts = () => {
+    fetch(`${API}/products/`)
+      .then(res => res.json())
+      .then(data => setProducts(Array.isArray(data) ? data : data.results));
   };
 
   useEffect(() => {
-    fetchNotes();
+    selectedTab === 'notes' ? fetchNotes() : fetchProducts();
     fetchProfile();
-  }, []);
-
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      fetchNotes(search);
-    }, 400);
-    return () => clearTimeout(delay);
-  }, [search]);
+  }, [selectedTab]);
 
   const handleSubmit = (e) => {
-  e.preventDefault();
-
-  const formData = new FormData();
-  formData.append('title', form.title);
-  formData.append('content', form.content);
-  if (form.file instanceof File) {
-    formData.append('file', form.file);
-  }
-
-  const method = editNoteId ? 'PUT' : 'POST';
-  const url = editNoteId ? `${API}/notes/${editNoteId}/` : `${API}/notes/`;
-
-  fetch(url, {
-    method,
-    credentials: 'include',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-    },
-    body: formData,
-  })
-    .then(res => {
-      if (res.status === 403) {
-        alert('Вы не можете редактировать чужую заметку.');
-        return null;
-      }
-      return res.json();
-    })
-    .then(data => {
-      if (data) {
-        setForm({ title: '', content: '', file: null });
-        setEditNoteId(null);
-        fetchNotes();
-      }
-    })
-    .catch(() => alert('Ошибка при сохранении'));
-};
-
-
-  const handleRegister = (e) => {
     e.preventDefault();
 
-    fetch(`${API}/users/register/`, {
-      method: 'POST',
+    const formData = new FormData();
+    formData.append('title', form.title);
+    formData.append('content', form.content);
+    if (form.file instanceof File) {
+      formData.append('file', form.file);
+    }
+    if (selectedTab === 'products') {
+  formData.append('description', form.content); 
+  formData.delete('content'); 
+}
+
+    const url = selectedTab === 'notes'
+      ? (editNoteId ? `${API}/notes/${editNoteId}/` : `${API}/notes/`)
+      : `${API}/products/`;
+    const method = selectedTab === 'notes' && editNoteId ? 'PUT' : 'POST';
+
+    fetch(url, {
+      method,
+      credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
         'X-CSRFToken': getCookie('csrftoken'),
       },
-      credentials: 'include',
-      body: JSON.stringify(registerForm),
+      body: formData,
     })
-      .then(res => {
-        if (res.status === 201) {
-          alert('Регистрация успешна. Теперь войдите.');
-        } else {
-          alert('Ошибка регистрации');
-        }
+      .then(res => res.json())
+      .then(() => {
+        setForm({ title: '', content: '', file: null, price: '' });
+        setEditNoteId(null);
+        selectedTab === 'notes' ? fetchNotes() : fetchProducts();
       });
+  };
+
+  const handleDelete = (id, type) => {
+    if (!window.confirm('Удалить?')) return;
+    fetch(`${API}/${type}/${id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+      credentials: 'include',
+    }).then(() => {
+      type === 'notes' ? fetchNotes() : fetchProducts();
+    });
+  };
+
+  const handleAddProductToNotes = (product) => {
+  const formData = new FormData();
+  formData.append('title', product.title);
+  formData.append('content', product.description || ''); // 👈 вот тут точно копируем
+  if (product.file) {
+    // если product.file — строка URL
+    fetch(product.file)
+      .then(res => res.blob())
+      .then(blob => {
+        const filename = product.file.split('/').pop();
+        formData.append('file', new File([blob], filename));
+        sendNote();
+      });
+  } else {
+    sendNote();
+  }
+
+  function sendNote() {
+    fetch(`${API}/notes/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: formData,
+    })
+      .then(() => {
+        alert('Шаблон добавлен в заметки!');
+        fetchNotes();
+      });
+  }
+};
+
+  const fetchProfile = () => {
+    fetch(`${API}/users/profile/`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setUser(data.user))
+      .catch(() => setUser(null));
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
-
     fetch(`${API}/users/login/`, {
       method: 'POST',
       headers: {
@@ -132,206 +144,110 @@ function App() {
       .then(res => res.json())
       .then(data => {
         if (data.message === 'Вы вошли') {
-          alert('Вход выполнен');
           fetchProfile();
-          fetchUsers();
         } else {
           alert('Ошибка входа');
         }
       });
   };
 
-  const handleLogout = () => {
-    fetch(`${API}/users/logout/`, {
+  const handleRegister = (e) => {
+    e.preventDefault();
+    fetch(`${API}/users/register/`, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'X-CSRFToken': getCookie('csrftoken'),
       },
       credentials: 'include',
-    }).then(() => {
-      setUser(null);
-      alert('Вы вышли');
+      body: JSON.stringify(registerForm),
+    }).then(res => {
+      if (res.status === 201) alert('Регистрация успешна');
+      else alert('Ошибка регистрации');
     });
   };
 
-  const handleDelete = (noteId) => {
-  if (!window.confirm('Удалить эту заметку?')) return;
-
-  fetch(`${API}/notes/${noteId}/`, {
-    method: 'DELETE',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-    },
-    credentials: 'include',
-  })
-    .then(res => {
-      if (res.status === 403) {
-        alert('Вы не можете удалить чужую заметку.');
-        return;
-      }
-      if (res.status === 204) {
-        alert('Заметка удалена');
-        fetchNotes();
-      }
-    })
-    .catch(() => alert('Ошибка при удалении'));
-};
-
-  const fetchProfile = () => {
-    fetch(`${API}/users/profile/`, {
+  const handleLogout = () => {
+    fetch(`${API}/users/logout/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
       credentials: 'include',
-    })
-      .then(res => {
-        if (res.status === 200) return res.json();
-        throw new Error();
-      })
-      .then(data => setUser(data.user))
-      .catch(() => setUser(null));
-  };
-
-  const fetchUsers = () => {
-    fetch(`${API}/users/list/`, {
-      credentials: 'include',
-    })
-      .then(res => res.json())
-      .then(data => setUsers(data.results || []));
+    }).then(() => setUser(null));
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: 20 }}>
-      <h2>Заметки</h2>
+    <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
+      <h2>📌 Сервис заметок</h2>
 
       {!user && (
         <>
-          <form onSubmit={handleRegister} style={{ marginBottom: 20 }}>
+          <form onSubmit={handleRegister}>
             <h4>Регистрация</h4>
-            <input
-              type="text"
-              placeholder="Логин"
-              value={registerForm.username}
-              onChange={e => setRegisterForm({ ...registerForm, username: e.target.value })}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Пароль"
-              value={registerForm.password}
-              onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })}
-              required
-            />
-            <input
-              type="number"
-              placeholder="Возраст"
-              value={registerForm.age}
-              onChange={e => setRegisterForm({ ...registerForm, age: e.target.value })}
-              required
-            />
-            <button type="submit">Зарегистрироваться</button>
+            <input placeholder="Логин" onChange={e => setRegisterForm({ ...registerForm, username: e.target.value })} />
+            <input placeholder="Пароль" type="password" onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })} />
+            <input placeholder="Возраст" type="number" onChange={e => setRegisterForm({ ...registerForm, age: e.target.value })} />
+            <button>Зарегистрироваться</button>
           </form>
 
-          <form onSubmit={handleLogin} style={{ marginBottom: 20 }}>
+          <form onSubmit={handleLogin}>
             <h4>Вход</h4>
-            <input
-              type="text"
-              placeholder="Логин"
-              value={loginForm.username}
-              onChange={e => setLoginForm({ ...loginForm, username: e.target.value })}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Пароль"
-              value={loginForm.password}
-              onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-              required
-            />
-            <button type="submit">Войти</button>
+            <input placeholder="Логин" onChange={e => setLoginForm({ ...loginForm, username: e.target.value })} />
+            <input placeholder="Пароль" type="password" onChange={e => setLoginForm({ ...loginForm, password: e.target.value })} />
+            <button>Войти</button>
           </form>
         </>
       )}
 
       {user && (
         <>
-          <p>👤 Вы вошли как <strong>{user}</strong></p>
+          <p>👤 Вы вошли как <b>{user}</b></p>
           <button onClick={handleLogout}>Выйти</button>
-
-          <div style={{ marginTop: 20 }}>
-            <h4>Пользователи</h4>
-            <ul>
-              {users.map(u => (
-                <li key={u.username}>{u.username}</li>
-              ))}
-            </ul>
-          </div>
         </>
       )}
 
-      <input
-        type="text"
-        placeholder="Поиск..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', marginBottom: 10 }}
-      />
+      <div style={{ margin: '20px 0' }}>
+        <button onClick={() => setSelectedTab('notes')}>Мои заметки</button>
+        <button onClick={() => setSelectedTab('products')} style={{ marginLeft: 10 }}>Шаблоны</button>
+      </div>
 
-      <form onSubmit={handleSubmit} encType="multipart/form-data">
-        <input
-          type="text"
-          placeholder="Заголовок"
-          value={form.title}
-          onChange={e => setForm({ ...form, title: e.target.value })}
-          required
-        />
-        <br />
-        <textarea
-          placeholder="Описание"
-          value={form.content}
-          onChange={e => setForm({ ...form, content: e.target.value })}
-        />
-        <br />
-        <input
-          type="file"
-          onChange={e => setForm({ ...form, file: e.target.files[0] })}
-        />
-        <br />
-        <button type="submit" disabled={!user}>Добавить</button>
+      <form onSubmit={handleSubmit}>
+        <h4>{selectedTab === 'notes' ? 'Новая заметка' : 'Новый шаблон'}</h4>
+        <input placeholder="Заголовок" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
+        <textarea placeholder="Текст" value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} />
+        {selectedTab === 'products' && (
+          <input type="number" placeholder="Цена" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+        )}
+        <input type="file" onChange={e => setForm({ ...form, file: e.target.files[0] })} />
+        <button type="submit" disabled={!user}>Сохранить</button>
       </form>
 
+      <hr />
+      <h3>{selectedTab === 'notes' ? '📃 Мои заметки' : '📋 Шаблоны'}</h3>
+
       <ul>
-        {Array.isArray(notes) && notes.length > 0 ? (
-          notes.map(note => (
-            <li key={note.id}>
-              <strong>{note.title}</strong><br />
-              {note.content}<br />
-              {note.file && (
-                <button onClick={() => window.open(`${note.file}`, '_blank')}>
-                    📎 Открыть файл
+        {(selectedTab === 'notes' ? notes : products).map(item => (
+          <li key={item.id} style={{ marginBottom: 15 }}>
+            <b>{item.title}</b><br />
+            <div style={{ whiteSpace: 'pre-wrap', marginTop: 5 }}>
+              {selectedTab === 'notes' ? item.content : item.description}
+            </div>
+            {item.price && (
+              <div style={{ color: 'green', marginTop: 4 }}>
+                💰 {item.price} ₽
+              </div>
+            )}
+            <div style={{ marginTop: 5 }}>
+              {item.owner === user && (
+                <button onClick={() => handleDelete(item.id, selectedTab)}>Удалить</button>
+              )}
+              {selectedTab === 'products' && (
+                <button onClick={() => handleAddProductToNotes(item)} style={{ marginLeft: 10 }}>
+                  Добавить в заметки
                 </button>
               )}
-              {note.owner === user && (
-                <button onClick={() => handleDelete(note.id)} style={{ marginLeft: 10 }}>
-                  ❌ Удалить
-                </button>
-              )}
-              <button onClick={() => {
-                  setEditNoteId(note.id);
-                  setForm({ title: note.title, content: note.content, file: null });
-                }} style={{ marginLeft: 5 }}>
-                  ✏️ Редактировать
-                </button>
-                {editNoteId === note.id && (
-                    <button onClick={() => {
-                      setEditNoteId(null);
-                      setForm({ title: '', content: '', file: null });
-                    }} style={{ marginLeft: 10 }}>
-                      Отменить редактирование
-                    </button>
-                  )}
-            </li>
-          ))
-        ) : (
-          <p style={{ color: 'gray' }}>Нет заметок для отображения.</p>
-        )}
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );

@@ -12,6 +12,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.viewsets import ModelViewSet
 
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,8 +20,21 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 
 from .models import Note
-from .serializers import NoteSerializer
+from .models import Product
 
+from .serializers import NoteSerializer
+from .serializers import ProductSerializer
+
+
+class ProductViewSet(ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+        
 class SafeInputView(APIView):
     permission_classes = [AllowAny]
 

@@ -1,12 +1,19 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+
 from .views import (
     HelloWorldAPIView,
     NoteListCreateAPIView,
     NoteRetrieveUpdateDestroyAPIView,
     RegisterView, LoginView, LogoutView,
     ProfileView, UserListView,
-    SafeInputView
+    SafeInputView,
+    ProductViewSet
 )
+
+router = DefaultRouter()
+router.register(r'products', ProductViewSet, basename='product')
 
 urlpatterns = [
     path('hello/', HelloWorldAPIView.as_view(), name='hello-world'),
@@ -25,3 +32,5 @@ urlpatterns += [
 urlpatterns += [
     path('safe/', SafeInputView.as_view()),
 ]
+
+urlpatterns += router.urls
